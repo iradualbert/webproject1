@@ -1,0 +1,10 @@
+    <div class="">
+    <img class="rounded-circle article-img" src="{{ answer.user_info.profile.profile_pic.url }}">
+    <div class="media-body">
+        <div class="article-metadata">
+            <a class="mr-2" href="#">Answered by {{answer.user_info.username}}</a>
+            <small class="text-muted">{{answer.date_submitted}}</small>
+        </div>
+        <p class="article-content text-muted">{{ answer.answer_content|safe }}</p>
+    </div>
+    </div>

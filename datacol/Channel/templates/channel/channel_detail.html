@@ -1,0 +1,243 @@
+{%extends "main/base.html"%}
+{% load i18n %}
+{% load crispy_forms_tags %}
+{% block content %}
+<style>
+.lds-hourglass {
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+.lds-hourglass:after {
+  content: " ";
+  display: block;
+  border-radius: 50%;
+  width: 0;
+  height: 0;
+  margin: 8px;
+  box-sizing: border-box;
+  border: 32px solid #dfc;
+  border-color: #dfc transparent #dfc transparent;
+  animation: lds-hourglass 1.2s infinite;
+}
+@keyframes lds-hourglass {
+  0% {
+    transform: rotate(0);
+    animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  }
+  50% {
+    transform: rotate(900deg);
+    animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+  100% {
+    transform: rotate(1800deg);
+  }
+}
+
+
+</style>
+
+
+<!-- Modal -->
+{% include 'modal/subscription.html' %}
+
+<div class="container-fluid">
+    <div class="row">
+        {% include 'channel/channel_nav_left.html'%}
+
+        <div class="col-md-7">
+            <div class="content-section">
+                <div class="media">
+                    <img class="rounded-circle account-img" src="{{ object.channel_profile_pic.url }}">
+
+                    <div class="media-body">
+                        <br>
+                        <h1>{{ object.channel_name}}</h1>
+                        <h5 ><small class="text-muted">{{ object.get_subscribers_no}} Subscribers {{object.id}}</small></h5>
+                        <h5 ><small class="text-muted">{{ object.get_channel_topics|length }} Topics</small></h5>
+                        <div class="">
+                            <a class="btn btn-outline-success" href="{% url 'add-question' object.channel_code %}">Add Question</a>
+                            <button type="button" class="btn btn-outline-success" data-toggle="modal" data-target="#exampleModal" data-whatever="@getbootstrap">Write Review</button>
+                            {% if user == object.owner %}
+                            <button type="button" class="btn btn-outline-success" data-toggle="modal" data-target="#exampleModal" data-whatever="@getbootstrap">New Topic</button>
+                            {% else %}
+                            <button type="button" class="btn btn-outline-success" id="subButton">{{ sub_button_text }}</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {%for question in questions %}
+            <article class="media content-section">
+                <img class="rounded-circle article-img" src="{{ question.user_info.profile.profile_pic.url }}">
+                <div class="media-body">
+                    <div class="article-metadata">
+                        <a class="mr-2" href="#">Asked by {{question.user_info.username}}</a>
+                        <small class="text-muted">{{question.date_submitted}}</small>
+                    </div>
+                    <h5><a class="article-title" href="#">{{ question.question_title }}</a></h5>
+                    <p class="article-content text-muted">{{ question.question_detail|safe }}</p>
+                    {% for answer in question.get_question_answers %}
+                     {% include 'ajax/answer_ajax.html'%}
+                    {% endfor %}
+
+                </div>
+
+            </article>
+            {% endfor %}
+
+
+
+
+            <div class="topic_hide_show" id="topic_hide_show">
+                <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="exampleModalLabel">Create New Lead</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="container">
+                                    <div id="success_fail_message"></div>
+                                    <div id="ajax-form"></div>
+                                    {% include 'ajax/topic_form_ajax.html' %}
+                                </div>
+                            </div>
+                        </div>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+
+
+
+
+</div>
+
+
+    <script type="text/javascript">
+
+        $(document).ready(function(){
+
+        // handle subscription
+        var subButton = $("#subButton");
+        subButton.click(function(event){
+              event.preventDefault();
+              if('{{user.is_authenticated}}'==='False'){
+                  alert('Please Log In or Create Account To Subscribe');
+                  return false;
+              };
+              var actionEndpoint = "{{request.build_absolute_uri|safe}}subscription/";
+              $.ajax({
+                     url: actionEndpoint,
+                     method: 'POST',
+                     data:{
+                         csrfmiddlewaretoken: '{{ csrf_token }}'
+                     },
+
+                     success: function(data){
+                        if (data.response === 'Subscribed'){
+                             subButton.html("Unsubscribe");
+                        }
+                        else if(data.response ==='Unsubscribed'){
+                             subButton.html("Subscribe");
+                        };
+                        $("#subModal").modal('show');
+                        $("#subMessage").text(`${data.response}`+' to '+ '{{object.channel_name}}');
+
+                     },
+                     error: function(errorData){
+                        return false;
+                     }
+
+                 });
+                 return true;
+        });
+
+       // creating new topic
+             var topicForm = $(".new-topic-form");
+             topicForm.submit(function(event){
+
+                 event.preventDefault();
+                 console.log("Form is not sending");
+                 var thisForm = $(this);
+                 var actionEndpoint = "{{request.build_absolute_uri|safe}}create_topic/";
+                 var httpMethod = thisForm.attr("method");
+                 var formData = thisForm.serialize();
+
+                 $.ajax({
+                     url: actionEndpoint,
+                     method: httpMethod,
+                     data: formData,
+                     success: function(data){
+                        // Save values for future use
+                        var title_name = $("[name='title_name']").val();
+
+                        topicForm.trigger('reset');
+                        document.getElementById('new_topic_form').style.display="none";
+                        var text_div = document.getElementById('success_fail_message');
+                        // text_div.innerHTML = '<div class="text-center">'+'<div class="lds-hourglass">'+'</div>'+'<h2>'+'wait a moment....'+'</h2>'+'</div>'
+                        text_div.innerHTML = '<div class="text-center"><div class="lds-hourglass"></div><h2>wait a moment....</h2></div>'
+                        // text_div.innerHTML = '<div class="text-center">'+'<div class="lds-spinner">'+'<div>'+'</div>'+'<div>'+'</div>'+'<div>'+'</div>'+'<div>'+'</div>'+'<div>'+'</div>'+'<div>'+'</div>'+'<div>'+'</div>'+'<div>'+'</div>'+'<div>'+'</div>'+'</div'
+                        // text_div.className +='alert alert-success';
+                        // text_div.innerHTML="Saved";
+
+
+                          $(".topics").prepend('<div class="col-md-6">'+
+                         '<div class="row no-gutters border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative">' +
+                         '<div class="col p-4 d-flex flex-column position-static">' +
+                         '<h3 class="mb-0">' + title_name + '</h3>' +
+                         '<p class="mb-auto">' + 'json.description' + '</p>' +
+                         '</div>' +
+                         '</div>' +
+                         '</div>' )
+
+                        // resetting the form
+                        function sleep(ms) {
+                        return new Promise(resolve => setTimeout(resolve, ms));
+                        }
+
+                        sleep(1000).then(() => {
+
+                        $("#exampleModal").modal("hide");
+                        text_div.innerHTML=null;
+                        text_div.className = '';
+                        document.getElementById('new_topic_form').style.display="block";
+
+                        });
+
+
+                     },
+                     error: function(errorData){
+
+                        alert("The name is too long");
+                        console.log(errorData);
+                     }
+
+                 });
+                 return false;
+
+
+
+
+             }
+
+             )
+
+        })
+
+    </script>
+    <script>
+
+    </script>
+
+
+
+{% endblock %}
